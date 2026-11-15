@@ -9,80 +9,62 @@ import matplotlib.pyplot as plt
 def read_csv(file_path: str) -> pd.DataFrame:
     """
     Reads a CSV file and returns its content as a pandas DataFrame.
-
-    Parameters:
-    file_path (str): Path to the CSV file.
-
-    Returns:
-    pd.DataFrame: Loaded data.
     """
-    data = pd.read_csv(file_path)
+    try:
+        data = pd.read_csv(file_path)
+    except pd.errors.EmptyDataError as exc:
+        raise ValueError("The CSV file is empty.") from exc
     if data.empty:
         raise ValueError("The CSV file is empty.")
+    required_columns = {"Size", "Price"}
+    if not required_columns.issubset(set(data.columns)):
+        raise ValueError("CSV file must contain 'Size' and 'Price' columns.")
     return data
 
 
 def train_polynomial_regression(X: np.array, y: np.array, degree: int):
     """
     Trains a polynomial regression model.
-
-    Parameters:
-    X (np.array): Independent variable (e.g., house sizes).
-    y (np.array): Dependent variable (e.g., house prices).
-    degree (int): Degree of the polynomial.
-
-    Returns:
-    tuple: Trained model and polynomial feature transformer.
     """
+    X_arr = np.asarray(X).reshape(-1, 1)
+    y_arr = np.asarray(y)
 
+    poly = PolynomialFeatures(degree=degree)
+    X_poly = poly.fit_transform(X_arr)
+
+    model = LinearRegression()
+    model.fit(X_poly, y_arr)
     return model, poly
 
 
 def predict_prices(model: LinearRegression, poly: PolynomialFeatures, X: np.array):
     """
     Predicts prices using the trained polynomial regression model.
-
-    Parameters:
-    model (LinearRegression): Trained polynomial regression model.
-    poly (PolynomialFeatures): Polynomial feature transformer.
-    X (np.array): Independent variable for prediction.
-
-    Returns:
-    np.array: Predicted prices.
     """
-
+    X_arr = np.asarray(X).reshape(-1, 1)
+    X_poly = poly.transform(X_arr)
     return model.predict(X_poly)
 
 
 def evaluate_model(y_true: np.array, y_pred: np.array):
     """
     Evaluates the model using various metrics.
-
-    Parameters:
-    y_true (np.array): Actual prices.
-    y_pred (np.array): Predicted prices.
-
-    Returns:
-    dict: Evaluation metrics.
     """
-
+    mae = float(mean_absolute_error(y_true, y_pred))
+    mse = float(mean_squared_error(y_true, y_pred))
+    rmse = float(np.sqrt(mse))
     return {"MAE": mae, "MSE": mse, "RMSE": rmse}
 
 
 def visualize_data(X: np.array, y: np.array, model: LinearRegression, poly: PolynomialFeatures):
     """
     Visualizes the original data and the regression curve.
-
-    Parameters:
-    X (np.array): Independent variable (e.g., house sizes).
-    y (np.array): Dependent variable (e.g., house prices).
-    model (LinearRegression): Trained polynomial regression model.
-    poly (PolynomialFeatures): Polynomial feature transformer.
     """
-    X_plot = np.linspace(X.min(), X.max(), 100)
+    X_arr = np.asarray(X)
+    X_plot = np.linspace(X_arr.min(), X_arr.max(), 100)
     y_plot = predict_prices(model, poly, X_plot)
 
-    plt.scatter(X, y, color="blue", label="Actual Prices")
+    plt.scatter(X_arr, y, color="blue", label="Actual Prices")
     plt.plot(X_plot, y_plot, color="red", label="Polynomial Regression Fit")
     plt.xlabel("House Size")
     plt.ylabel("House Price")
@@ -92,26 +74,19 @@ def visualize_data(X: np.array, y: np.array, model: LinearRegression, poly: Poly
 
 
 if __name__ == "__main__":
-    # Step 1: Load data
-    file_path = "../house_data.csv"  # Path to dataset
+    file_path = "../house_data.csv"
     data = read_csv(file_path)
 
-    # Step 2: Extract features and target
     X = data["Size"].values
     y = data["Price"].values
 
-    # Step 3: Train polynomial regression model
     degree = 3
     model, poly = train_polynomial_regression(X, y, degree)
-
-    # Step 4: Predict prices
     predictions = predict_prices(model, poly, X)
 
-    # Step 5: Evaluate model
     metrics = evaluate_model(y, predictions)
     print("Model Evaluation Metrics:")
     for metric, value in metrics.items():
         print(f"{metric}: {value:.2f}")
 
-    # Step 6: Visualize results
     visualize_data(X, y, model, poly)
